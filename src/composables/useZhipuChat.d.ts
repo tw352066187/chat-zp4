@@ -4,6 +4,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant' | 'system'
   content: string
+  reasoning?: string
   parts?: Array<{ type: 'text'; text: string }>
 }
 

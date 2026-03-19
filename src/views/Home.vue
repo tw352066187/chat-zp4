@@ -39,6 +39,11 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai-elements/prompt-input";
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+} from "@/components/ai-elements/chain-of-thought";
 import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
 import { CheckIcon, GlobeIcon, MicIcon, Trash2Icon } from "lucide-vue-next";
 import { computed, ref } from "vue";
@@ -142,6 +147,15 @@ const toggleWebSearch = () => (useWebSearch.value = !useWebSearch.value);
             <!-- 消息列表 -->
             <Message v-for="msg in chatMessages" :key="msg.id" :from="msg.role">
               <MessageContent>
+                <!-- 思考内容 -->
+                <ChainOfThought v-if="msg.reasoning" :default-open="true">
+                  <ChainOfThoughtHeader>思考过程</ChainOfThoughtHeader>
+                  <ChainOfThoughtContent>
+                    <div class="max-h-[300px] overflow-y-auto text-sm text-muted-foreground">
+                      <MessageResponse :content="msg.reasoning" />
+                    </div>
+                  </ChainOfThoughtContent>
+                </ChainOfThought>
                 <MessageResponse
                   :content="msg.content"
                   :controls="{

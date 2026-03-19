@@ -33,4 +33,4 @@ export const ZHIPU_MODELS = [
 ]
 
 // 默认模型
-export const DEFAULT_MODEL = 'glm-4-flash'
+export const DEFAULT_MODEL = 'glm-4.7-flash'

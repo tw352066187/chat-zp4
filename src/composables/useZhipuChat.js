@@ -20,14 +20,15 @@ let abortController = null
 /**
  * 更新助手消息内容
  */
-function updateAssistantMessage(id, content) {
+function updateAssistantMessage(id, content, reasoning) {
   const index = messages.value.findIndex(msg => msg.id === id)
   if (index !== -1) {
     const updatedMessages = [...messages.value]
     updatedMessages[index] = {
       ...updatedMessages[index],
       content,
-      parts: [{ type: 'text', text: content }]
+      reasoning: reasoning ?? updatedMessages[index].reasoning,
+      parts: [{ type: 'text', text: content }],
     }
     messages.value = updatedMessages
   }
@@ -73,6 +74,7 @@ export function useZhipuChat(options = {}) {
       id: nanoid(),
       role: 'assistant',
       content: '',
+      reasoning: '',
       parts: [{ type: 'text', text: '' }],
     }
     messages.value = [...messages.value, assistantMessage]
@@ -102,6 +104,7 @@ export function useZhipuChat(options = {}) {
           model: currentModel.value,
           messages: apiMessages,
           stream: true,
+          thinking: { type: 'disabled' },
         }),
         signal: abortController.signal,
       })
@@ -118,6 +121,7 @@ export function useZhipuChat(options = {}) {
       const decoder = new TextDecoder()
       let buffer = ''
       let fullContent = ''
+      let fullReasoning = ''
 
       while (true) {
         const { done, value } = await reader.read()
@@ -137,11 +141,18 @@ export function useZhipuChat(options = {}) {
 
           try {
             const parsed = JSON.parse(data)
-            const content = parsed.choices?.[0]?.delta?.content || ''
+            const delta = parsed.choices?.[0]?.delta || {}
+            const content = delta.content || ''
+            const reasoning = delta.reasoning_content || ''
             
+            if (reasoning) {
+              fullReasoning += reasoning
+            }
             if (content) {
               fullContent += content
-              updateAssistantMessage(assistantMessage.id, fullContent)
+            }
+            if (reasoning || content) {
+              updateAssistantMessage(assistantMessage.id, fullContent, fullReasoning)
             }
           } catch (e) {
             // 忽略解析错误
