@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>手写 createApp 示例</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    #app {
+      background: white;
+      border-radius: 16px;
+      padding: 40px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 100%;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .counter {
+      text-align: center;
+      margin: 30px 0;
+    }
+
+    .count {
+      font-size: 72px;
+      font-weight: bold;
+      color: #667eea;
+      margin: 20px 0;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-weight: 600;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-danger {
+      background: #f56565;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #e53e3e;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(245, 101, 101, 0.4);
+    }
+
+    .btn-success {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #38a169;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+    }
+
+    .info {
+      margin-top: 30px;
+      padding: 20px;
+      background: #f7fafc;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    .info h3 {
+      color: #667eea;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    .info p {
+      color: #666;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .console-tip {
+      margin-top: 20px;
+      padding: 15px;
+      background: #fffbeb;
+      border-radius: 8px;
+      border-left: 4px solid #f59e0b;
+      font-size: 14px;
+      color: #92400e;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    // 直接内联 createApp 代码，避免 CORS 问题
+    
+    // ========== 响应式系统 ==========
+    function reactive(target) {
+      return new Proxy(target, {
+        get(target, key) {
+          const result = target[key]
+          console.log(`[响应式] 读取属性: ${key}`)
+          return result
+        },
+        set(target, key, value) {
+          console.log(`[响应式] 设置属性: ${key} = ${value}`)
+          target[key] = value
+          update()
+          return true
+        }
+      })
+    }
+
+    function ref(value) {
+      return reactive({ value })
+    }
+
+    let currentUpdateFn = null
+    function update() {
+      if (currentUpdateFn) {
+        currentUpdateFn()
+      }
+    }
+
+    // ========== VNode 创建 ==========
+    function createVNode(type, props = {}, children = null) {
+      return {
+        type,
+        props,
+        children,
+        el: null,
+        component: null
+      }
+    }
+
+    // ========== 渲染器 ==========
+    // 渲染器是 Vue 的核心，负责将 VNode 转换成真实 DOM
+    function createRenderer() {
+      
+      /**
+       * 挂载普通 HTML 元素（如 div、button 等）
+       * @param {Object} vnode - 虚拟节点对象
+       * @param {HTMLElement} container - 要挂载到的父容器
+       */
+      function mountElement(vnode, container) {
+        // 1. 根据 vnode.type 创建真实 DOM 元素
+        // 例如：vnode.type = 'div' → document.createElement('div')
+        const el = document.createElement(vnode.type)
+        
+        // 2. 将真实 DOM 元素保存到 vnode.el，方便后续更新时使用
+        vnode.el = el
+
+        // 3. 处理元素的属性和事件
+        if (vnode.props) {
+          // 遍历所有 props（属性和事件）
+          for (const key in vnode.props) {
+            const value = vnode.props[key]
+            
+            // 3.1 判断是否是事件（以 'on' 开头的属性）
+            if (key.startsWith('on')) {
+              // 提取事件名：onClick → click, onMouseover → mouseover
+              const eventName = key.slice(2).toLowerCase()
+              // 绑定事件监听器
+              el.addEventListener(eventName, value)
+            } else {
+              // 3.2 普通属性直接设置到 DOM 上
+              // 例如：class="button" → el.setAttribute('class', 'button')
+              el.setAttribute(key, value)
+            }
+          }
+        }
+
+        // 4. 处理子节点
+        if (typeof vnode.children === 'string') {
+          // 4.1 如果子节点是字符串，直接设置为文本内容
+          el.textContent = vnode.children
+        } else if (Array.isArray(vnode.children)) {
+          // 4.2 如果子节点是数组，递归挂载每个子节点
+          vnode.children.forEach(child => {
+            mount(child, el) // 递归调用 mount，将子节点挂载到当前元素
+          })
+        }
+
+        // 5. 将创建好的元素添加到父容器中
+        container.appendChild(el)
+      }
+
+      /**
+       * 挂载组件（如 CounterApp）
+       * @param {Object} vnode - 组件的虚拟节点
+       * @param {HTMLElement} container - 要挂载到的父容器
+       */
+      function mountComponent(vnode, container) {
+        // 1. 获取组件定义对象（包含 setup 和 render 方法）
+        const component = vnode.type
+        
+        // 2. 创建组件实例，用于保存组件的状态和信息
+        const instance = {
+          vnode,              // 组件的虚拟节点
+          type: component,    // 组件定义
+          setupState: null,   // setup 函数返回的状态（响应式数据和方法）
+          isMounted: false,   // 是否已挂载的标志
+          subTree: null       // 组件渲染的子树（VNode）
+        }
+        
+        // 3. 将组件实例保存到 vnode 上，方便后续访问
+        vnode.component = instance
+
+        // 4. 执行组件的 setup 函数，获取响应式状态
+        if (component.setup) {
+          // setup 返回的对象包含响应式数据（如 count、message）和方法（如 increment）
+          const setupResult = component.setup(vnode.props)
+          instance.setupState = setupResult
+        }
+
+        // 5. 创建组件的更新函数（核心：响应式更新的关键）
+        const componentUpdateFn = () => {
+          if (!instance.isMounted) {
+            // 5.1 首次挂载流程
+            console.log('[生命周期] 组件挂载')
+            
+            // 执行 render 函数，生成组件的子树（VNode）
+            // 使用 call 绑定 this 为 setupState，这样 render 中可以访问响应式数据
+            const subTree = component.render.call(instance.setupState)
+            instance.subTree = subTree
+            
+            // 递归挂载子树到容器
+            mount(subTree, container)
+            
+            // 标记为已挂载
+            instance.isMounted = true
+          } else {
+            // 5.2 更新流程（当响应式数据变化时触发）
+            console.log('[生命周期] 组件更新')
+            
+            // 重新执行 render 函数，生成新的子树
+            const newSubTree = component.render.call(instance.setupState)
+            
+            // 简化版：直接清空容器重新渲染
+            // 真实 Vue 会使用 diff 算法对比新旧子树，只更新变化的部分
+            container.innerHTML = ''
+            mount(newSubTree, container)
+            
+            // 保存新的子树
+            instance.subTree = newSubTree
+          }
+        }
+
+        // 6. 将更新函数设置为全局更新函数
+        // 当响应式数据变化时，会调用这个函数重新渲染
+        currentUpdateFn = componentUpdateFn
+        
+        // 7. 首次执行更新函数，完成初始渲染
+        componentUpdateFn()
+      }
+
+      /**
+       * 统一的挂载入口，根据 vnode 类型分发到不同的挂载函数
+       * @param {Object} vnode - 虚拟节点
+       * @param {HTMLElement} container - 父容器
+       */
+      function mount(vnode, container) {
+        if (typeof vnode.type === 'string') {
+          // type 是字符串 → 普通 HTML 元素（如 'div', 'button'）
+          mountElement(vnode, container)
+        } else if (typeof vnode.type === 'object') {
+          // type 是对象 → 组件（如 CounterApp）
+          mountComponent(vnode, container)
+        }
+      }
+
+      /**
+       * 渲染函数：将 VNode 渲染到容器中
+       * @param {Object|null} vnode - 虚拟节点，null 表示卸载
+       * @param {HTMLElement} container - 容器元素
+       */
+      function render(vnode, container) {
+        if (vnode) {
+          // 有 vnode → 挂载或更新
+          mount(vnode, container)
+        } else {
+          // vnode 为 null → 卸载，清空容器
+          container.innerHTML = ''
+        }
+      }
+
+      // 返回渲染器对象
+      return {
+        render,                           // 渲染函数
+        createApp: createAppAPI(render)   // 创建应用的工厂函数
+      }
+    }
+
+    // ========== createApp API ==========
+    function createAppAPI(render) {
+      return function createApp(rootComponent) {
+        const context = {
+          config: {
+            globalProperties: {}
+          },
+          components: {},
+          directives: {},
+          provides: {}
+        }
+
+        const installedPlugins = new Set()
+        let isMounted = false
+
+        const app = {
+          _component: rootComponent,
+          _container: null,
+          _context: context,
+
+          use(plugin, ...options) {
+            if (installedPlugins.has(plugin)) {
+              console.warn('[警告] 插件已安装')
+              return app
+            }
+
+            if (plugin && typeof plugin.install === 'function') {
+              installedPlugins.add(plugin)
+              plugin.install(app, ...options)
+              console.log('[插件] 安装成功:', plugin.name || '匿名插件')
+            }
+
+            return app
+          },
+
+          component(name, component) {
+            if (!component) {
+              return context.components[name]
+            }
+            console.log('[组件] 注册全局组件:', name)
+            context.components[name] = component
+            return app
+          },
+
+          provide(key, value) {
+            console.log('[依赖注入] 提供:', key)
+            context.provides[key] = value
+            return app
+          },
+
+          mount(rootContainer) {
+            if (!isMounted) {
+              console.log('[应用] 开始挂载到:', rootContainer)
+              
+              const container = typeof rootContainer === 'string'
+                ? document.querySelector(rootContainer)
+                : rootContainer
+
+              if (!container) {
+                console.error('[错误] 找不到挂载容器')
+                return
+              }
+
+              container.innerHTML = ''
+
+              const vnode = createVNode(rootComponent)
+              vnode.appContext = context
+
+              render(vnode, container)
+
+              isMounted = true
+              app._container = container
+
+              console.log('[应用] 挂载完成')
+
+              return vnode.component?.setupState
+            }
+          },
+
+          unmount() {
+            if (isMounted) {
+              console.log('[应用] 卸载')
+              render(null, app._container)
+              isMounted = false
+            }
+          }
+        }
+
+        return app
+      }
+    }
+
+    function createApp(rootComponent) {
+      const renderer = createRenderer()
+      return renderer.createApp(rootComponent)
+    }
+
+    // ========== 应用代码 ==========
+
+    // 定义一个计数器组件
+    const CounterApp = {
+      // setup 函数（Composition API）
+      setup() {
+        // 创建响应式数据
+        const count = ref(0)
+        const message = ref('欢迎使用手写 Vue!')
+
+        // 方法
+        const increment = () => {
+          count.value++
+        }
+
+        const decrement = () => {
+          count.value--
+        }
+
+        const reset = () => {
+          count.value = 0
+        }
+
+        // 返回给模板使用
+        return {
+          count,
+          message,
+          increment,
+          decrement,
+          reset
+        }
+      },
+
+      // render 函数（返回 VNode）
+      render() {
+        return {
+          type: 'div',
+          props: { class: 'app-container' },
+          children: [
+            // 标题
+            {
+              type: 'h1',
+              props: {},
+              children: '🎯 手写 Vue createApp'
+            },
+            {
+              type: 'p',
+              props: { class: 'subtitle' },
+              children: this.message.value
+            },
+
+            // 计数器显示
+            {
+              type: 'div',
+              props: { class: 'counter' },
+              children: [
+                {
+                  type: 'div',
+                  props: { class: 'count' },
+                  children: String(this.count.value)
+                }
+              ]
+            },
+
+            // 按钮组
+            {
+              type: 'div',
+              props: { class: 'buttons' },
+              children: [
+                {
+                  type: 'button',
+                  props: {
+                    class: 'btn-primary',
+                    onClick: this.increment
+                  },
+                  children: '➕ 增加'
+                },
+                {
+                  type: 'button',
+                  props: {
+                    class: 'btn-danger',
+                    onClick: this.decrement
+                  },
+                  children: '➖ 减少'
+                },
+                {
+                  type: 'button',
+                  props: {
+                    class: 'btn-success',
+                    onClick: this.reset
+                  },
+                  children: '🔄 重置'
+                }
+              ]
+            },
+
+            // 信息提示
+            {
+              type: 'div',
+              props: { class: 'info' },
+              children: [
+                {
+                  type: 'h3',
+                  props: {},
+                  children: '💡 实现原理'
+                },
+                {
+                  type: 'p',
+                  props: {},
+                  children: '这是一个简化版的 Vue 3 createApp 实现，包含了响应式系统、组件挂载、事件处理等核心功能。点击按钮可以看到响应式更新的效果。'
+                }
+              ]
+            },
+
+            // 控制台提示
+            {
+              type: 'div',
+              props: { class: 'console-tip' },
+              children: '💻 打开浏览器控制台，可以看到详细的执行日志'
+            }
+          ]
+        }
+      }
+    }
+
+    // 创建应用实例
+    const app = createApp(CounterApp)
+
+    // 可以链式调用（演示插件系统）
+    const myPlugin = {
+      name: '示例插件',
+      install(app) {
+        console.log('插件安装成功！')
+        // 简化版不需要设置 globalProperties
+      }
+    }
+
+    app.use(myPlugin)
+
+    // 挂载到 DOM
+    app.mount('#app')
+
+    // 在控制台暴露 app 实例，方便调试
+    window.app = app
+    console.log('%c🎉 应用已启动！', 'color: #667eea; font-size: 16px; font-weight: bold;')
+    console.log('%c可以在控制台输入 window.app 查看应用实例', 'color: #666; font-size: 12px;')
+  </script>
+</body>
+</html>
