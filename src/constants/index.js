@@ -21,7 +21,15 @@ export const ZHIPU_MODELS = [
     chefSlug: 'zhipu',
     description: '高性价比，适合日常对话',
     providers: ['zhipu'],
-  }
+  },
+  {
+    id: 'glm-4.7-flash',
+    name: 'GLM-4.7 Flash',
+    chef: '智谱',
+    chefSlug: 'zhipu',
+    description: '高性价比，适合日常对话',
+    providers: ['zhipu'],
+  },
 ]
 
 // 默认模型
