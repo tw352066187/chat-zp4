@@ -58,7 +58,7 @@ const {
   clearMessages,
 } = useZhipuChat({
   model: DEFAULT_MODEL,
-  onError: (err) => console.error('聊天错误:', err),
+  onError: (err) => console.error("聊天错误:", err),
 });
 
 // 状态映射
@@ -71,7 +71,7 @@ const useMicrophone = ref(false);
 
 // 当前选中的模型数据
 const selectedModelData = computed(() =>
-  ZHIPU_MODELS.find(({ id }) => id === currentModel.value)
+  ZHIPU_MODELS.find(({ id }) => id === currentModel.value),
 );
 
 // 建议列表
@@ -85,7 +85,7 @@ const suggestions = [
 // 处理消息提交
 function handleSubmit({ text, files }: PromptInputMessage) {
   if (isLoading.value) return;
-  
+
   const content = text.trim();
   if (content || files.length) {
     sendMessage({ text: content || "发送了附件" });
@@ -93,7 +93,7 @@ function handleSubmit({ text, files }: PromptInputMessage) {
 }
 
 // 处理建议点击
-const handleSuggestionClick = (text: string) => 
+const handleSuggestionClick = (text: string) =>
   !isLoading.value && sendMessage({ text });
 
 // 处理模型选择
@@ -108,53 +108,57 @@ const toggleWebSearch = () => (useWebSearch.value = !useWebSearch.value);
 </script>
 
 <template>
-  <div class="relative flex size-full flex-col divide-y overflow-hidden w-[1000px] mx-auto">
+  <div class="relative flex size-full flex-col overflow-hidden w-full">
     <!-- 错误提示 -->
-    <div v-if="chatError" class="bg-red-50 border-l-4 border-red-500 p-4 mx-4 mt-4">
-      <div class="flex">
-        <div class="ml-3">
-          <p class="text-sm text-red-700">
-            {{ chatError.message || '发生错误，请重试' }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="h-[calc(100vh-240px)]">
+    <div
+      class="relative flex flex-col size-full mx-auto h-[calc(100vh-240px)] overflow-auto"
+    >
       <Conversation>
         <ConversationContent>
-          <!-- 空状态提示 -->
-          <div v-if="chatMessages.length === 0" class="flex items-center justify-center h-full text-gray-400">
-            <div class="text-center">
-              <p class="text-lg mb-2">开始与智谱 AI 对话</p>
-              <p class="text-sm">选择下方的建议或输入你的问题</p>
+          <div
+            v-if="chatError"
+            class="bg-red-50 border-l-4 border-red-500 p-4 mx-4 mt-4"
+          >
+            <div class="flex">
+              <div class="ml-3">
+                <p class="text-sm text-red-700">
+                  {{ chatError.message || "发生错误，请重试" }}
+                </p>
+              </div>
             </div>
           </div>
+          <div class="w-[950px] mx-auto">
+            <!-- 空状态提示 -->
+            <div
+              v-if="chatMessages.length === 0"
+              class="flex items-center justify-center h-full text-gray-400"
+            >
+              <div class="text-center">
+                <p class="text-lg mb-2">开始与智谱 AI 对话</p>
+                <p class="text-sm">选择下方的建议或输入你的问题</p>
+              </div>
+            </div>
 
-          <!-- 消息列表 -->
-          <Message
-            v-for="msg in chatMessages"
-            :key="msg.id"
-            :from="msg.role"
-          >
-            <MessageContent>
-              <MessageResponse
-                :content="msg.content"
-                :controls="{
-                  mermaid: true,
-                }"
-                :shiki-options="{
-                  langs: ['ts', 'vue', 'javascript', 'python', 'css', 'html'],
-                }"
-              />
-            </MessageContent>
-          </Message>
+            <!-- 消息列表 -->
+            <Message v-for="msg in chatMessages" :key="msg.id" :from="msg.role">
+              <MessageContent>
+                <MessageResponse
+                  :content="msg.content"
+                  :controls="{
+                    mermaid: true,
+                  }"
+                  :shiki-options="{
+                    langs: ['ts', 'vue', 'javascript', 'python', 'css', 'html'],
+                  }"
+                />
+              </MessageContent>
+            </Message>
+          </div>
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
     </div>
-
-    <div class="grid shrink-0 gap-4 pt-4">
+    <div class="grid shrink-0 gap-4 pt-4 w-[1000px] mx-auto border-t">
       <Suggestions class="px-4">
         <Suggestion
           v-for="suggestion in suggestions"
@@ -203,8 +207,6 @@ const toggleWebSearch = () => (useWebSearch.value = !useWebSearch.value);
                 <span>Search</span>
               </PromptInputButton> -->
 
-              
-
               <ModelSelector v-model:open="modelSelectorOpen">
                 <ModelSelectorTrigger as-child>
                   <PromptInputButton>
@@ -232,7 +234,9 @@ const toggleWebSearch = () => (useWebSearch.value = !useWebSearch.value);
                       >
                         <ModelSelectorLogo :provider="m.chefSlug" />
                         <ModelSelectorName>{{ m.name }}</ModelSelectorName>
-                        <span class="text-xs text-gray-500 ml-2">{{ m.description }}</span>
+                        <span class="text-xs text-gray-500 ml-2">{{
+                          m.description
+                        }}</span>
                         <CheckIcon
                           v-if="currentModel === m.id"
                           class="ml-auto size-4"
